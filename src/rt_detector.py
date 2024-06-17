@@ -22,12 +22,16 @@ class Detections:
         self.tracker_id = tracker_id
         self.data = data
 
-def extract_colors(image, xyxy):
+def extract_colors(image, xyxy, blur_ksize=(5, 5)):
     colors = []
     for box in xyxy:
         x1, y1, x2, y2 = map(int, box)
         cropped_image = image[y1:y2, x1:x2]
-        mean_color = cv2.mean(cropped_image)[:3]  # Ottieni il colore medio (BGR)
+        
+        # Applica il blur gaussiano
+        blurred_image = cv2.GaussianBlur(cropped_image, blur_ksize, 0)
+        
+        mean_color = cv2.mean(blurred_image)[:3]  # Ottieni il colore medio (BGR)
         colors.append(mean_color)
     return np.array(colors)
 
@@ -97,7 +101,7 @@ def merge_detections(det1, det2):
 
 def process_frame(frame: np.ndarray, _) -> np.ndarray:
     global i,detections_with_clusters,cluster_centers,det2
-    results = model(frame, imgsz=1280,conf=0.3)[0]
+    results = model(frame, imgsz=1280,conf=0.0085)[0]
 
     detections = sv.Detections.from_ultralytics(results)
     #print(detections)
@@ -131,7 +135,7 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
     )
     
 
-    label_annotator = sv.LabelAnnotator(color=sv.Color.BLACK)
+    label_annotator = sv.LabelAnnotator(color=sv.Color.BLACK,text_padding=5)
 
     annotated_frame = label_annotator.annotate(
         scene=annotated_frame, detections=detections, labels=labels)
@@ -152,7 +156,7 @@ if __name__ == "__main__":
     file_name_with_extension = os.path.basename(VIDEO_PATH)
     videoname = os.path.splitext(file_name_with_extension)[0]
     box_annotator = sv.BoundingBoxAnnotator(thickness=1)
-    ellipse_annotator = sv.EllipseAnnotator(color=sv.Color.YELLOW)
+    ellipse_annotator = sv.EllipseAnnotator(color=sv.Color.YELLOW,thickness=2,start_angle=0,end_angle=200)
     label_annotator = sv.LabelAnnotator()
     trace_annotator = sv.TraceAnnotator()
     tracker = sv.ByteTrack()
