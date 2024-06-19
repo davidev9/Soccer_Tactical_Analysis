@@ -11,6 +11,7 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
+#Coordinate in metri del Campo 
 coordinate = {
     0: (0, 0),
     1: (0, 13.84),
@@ -43,6 +44,8 @@ coordinate = {
     28: (94, 43.16)
 }
 
+
+#Mapping tra le coordinate dell'immagine e quelle del campo
 def pitch_estimator(field_detections):
     name_array = field_detections.data['class_name']
     id_array = [int(x.strip("'")) for x in name_array]
@@ -52,14 +55,10 @@ def pitch_estimator(field_detections):
             )
     if num_keypoint<4:
         return [],[]
-
     first_4_ids = id_array[:4]
     first_4_points = points_array[:4]
-
     # Array indice + posizione
-    result_array = np.column_stack((first_4_ids, first_4_points))
-
-    
+    result_array = np.column_stack((first_4_ids, first_4_points)) 
     class_ids = result_array[:4, 0].astype(int)
     source_coordinates = np.array([point for point in first_4_points[:, 1]])
     target_coordinates = np.array([coordinate[class_id] for class_id in class_ids])
@@ -67,6 +66,8 @@ def pitch_estimator(field_detections):
     print(target_coordinates)
     return np.array(first_4_points),np.array(target_coordinates)
 
+
+#Classe per la trasformazione delle coordinate
 class ViewTransformer:
     def __init__(self, source: np.ndarray, target: np.ndarray) -> None:
         source = source.astype(np.float32)
@@ -85,7 +86,7 @@ class ViewTransformer:
 
 
 
-
+#Filtra i keypoint scartando i possibili duplicati e ordinando per confidence crescente
 def filter_detections(detections):
     # Trova gli indici delle prime detections per ogni class_id
     _, unique_indices = np.unique(detections.class_id, return_index=True)
@@ -119,9 +120,11 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
     global source,target
     ellipse_annotator = sv.EllipseAnnotator(color=sv.Color.YELLOW,thickness=1,start_angle=0,end_angle=200)
     circle_annotator = sv.CircleAnnotator(color=sv.Color.YELLOW,thickness=1)
+    label_annotator = sv.LabelAnnotator(color=sv.Color(r=39, g=85, b=156),text_padding=5)
+
 
     results = player_model(frame, imgsz=1280,conf=0.1)[0]
-    results2=field_model(frame,imgsz=1280,conf=0.075)[0]
+    results2=field_model(frame,imgsz=1280,conf=0.04)[0]
 
     detections = sv.Detections.from_ultralytics(results)
     detections = tracker.update_with_detections(detections).with_nms(threshold=0.1)
@@ -136,6 +139,8 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
         target=new_target
 
     annotated_frame=frame.copy()
+
+    #Se sono stati calcolati source e target vengono convertite le coordinate e inserite nelle label
     if len(source) > 0:
         view_transformer = ViewTransformer(source=source, target=target)
         points = detections.get_anchors_coordinates(
@@ -147,11 +152,16 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
         for j, detection in enumerate(detections):
             label=f"{detection[4]} xy:({points[j]})"
             labels.append(label)
-            
-        annotated_frame = label_annotator.annotate(
-        scene=annotated_frame, detections=detections, labels=labels)      
-        
+                 
+    else:
+        labels=[]
+        for j, detection in enumerate(detections):
+                label=f"{detection[4]}"
+                labels.append(label)      
 
+    annotated_frame = label_annotator.annotate(
+    scene=annotated_frame, detections=detections, labels=labels) 
+    #Annotazione delle istanze dei keypoint e dei players
     annotated_frame = circle_annotator.annotate(
     scene=annotated_frame,
     detections=detections2,
@@ -171,12 +181,10 @@ if __name__ == "__main__":
     print(HOME)
     player_model = YOLO("./yolo_weights/best.pt")
     field_model = YOLO("./yolo_weights/keypoint_field_v2.pt")
-    VIDEO_PATH="./videos/challenge-1179_1.mp4"
+    VIDEO_PATH="./videos/challenge-23_1.mp4"
     file_name_with_extension = os.path.basename(VIDEO_PATH)
     videoname = os.path.splitext(file_name_with_extension)[0]
     tracker = sv.ByteTrack()
-    label_annotator = sv.LabelAnnotator(color=sv.Color.BLUE,text_padding=5)
-    ellipse_annotator = sv.EllipseAnnotator(color=sv.Color.BLUE,thickness=1,start_angle=0,end_angle=200)
     source=[]
     target=[]
     sv.process_video(source_path=VIDEO_PATH, target_path=f"result.mp4", callback=process_frame)
