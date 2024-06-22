@@ -124,7 +124,7 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
 
 
     results = player_model(frame, imgsz=1280,conf=0.1)[0]
-    results2=field_model(frame,imgsz=1280,conf=0.04)[0]
+    results2=field_model(frame,imgsz=1280,conf=0.009)[0]
 
     detections = sv.Detections.from_ultralytics(results)
     detections = tracker.update_with_detections(detections).with_nms(threshold=0.1)
@@ -181,7 +181,7 @@ if __name__ == "__main__":
     print(HOME)
     player_model = YOLO("./yolo_weights/best.pt")
     field_model = YOLO("./yolo_weights/keypoint_field_v2.pt")
-    VIDEO_PATH="./videos/challenge-23_1.mp4"
+    VIDEO_PATH="./videos/soccernet_1.mp4"
     file_name_with_extension = os.path.basename(VIDEO_PATH)
     videoname = os.path.splitext(file_name_with_extension)[0]
     tracker = sv.ByteTrack()
