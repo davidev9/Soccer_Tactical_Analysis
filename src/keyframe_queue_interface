@@ -1,0 +1,123 @@
+from redis import Redis
+from PIL import Image
+import base64
+from io import BytesIO
+import json
+import matplotlib.pyplot as plt
+
+class Keyframe:
+    def __init__(self, image, video_name, minute, second, tracker_data):
+        self.image = image
+        self.video_name = video_name
+        self.minute = minute
+        self.second = second
+        self.tracker_data = tracker_data
+
+    def to_redis_format(self) -> bytes:
+        """
+        Serialize the Keyframe object into a format suitable for Redis storage.
+        """
+        image_bytes = self.serialize_image()
+        data = {
+            'video_name': self.video_name,
+            'minute': self.minute,
+            'second': self.second,
+            'tracker_data': self.tracker_data,
+            'image': image_bytes
+        }
+        return json.dumps(data).encode()
+
+    @classmethod
+    def from_redis_format(cls, serialized_data: bytes):
+        try:
+            data = json.loads(serialized_data)
+            image = cls.deserialize_image(data['image'])
+            return cls(image, data['video_name'], data['minute'], data['second'], data['tracker_data'])
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error decoding data: {e}")
+            print(f"Serialized data causing error: {serialized_data}")
+            return None
+
+
+    def serialize_image(self) -> str:
+        with BytesIO() as output:
+            self.image.save(output, format='PNG')
+            image_bytes = output.getvalue()
+        return base64.b64encode(image_bytes).decode('utf-8')
+
+    @staticmethod
+    def deserialize_image(encoded_image: str) -> Image:
+        image_bytes = base64.b64decode(encoded_image)
+        return Image.open(BytesIO(image_bytes))
+
+class KeyframeQueue:
+    def __init__(self, redis_conn: Redis):
+        if not isinstance(redis_conn, Redis):
+            raise ValueError("redis_conn must be a valid Redis connection!")
+        self._r = redis_conn
+
+    def push_keyframe(self, keyframe: Keyframe) -> int:
+        serialized_keyframe = keyframe.to_redis_format()
+        return self._r.lpush("keyframes", serialized_keyframe)
+
+    def pop_keyframe(self) -> (bytes | None, Keyframe | None):
+        serialized_keyframe = self._r.rpoplpush("keyframes", "keyframes_backup")
+        if not serialized_keyframe:
+            return (None, None)
+
+        keyframe = Keyframe.from_redis_format(serialized_keyframe)
+        return serialized_keyframe, keyframe
+
+    def del_keyframe_from_backup(self, keyframe_ref: bytes):
+        if keyframe_ref:
+            self._r.lrem("keyframes_backup", 1, keyframe_ref)
+
+def main():
+    # Connection to Redis with provided credentials
+    redis_conn = Redis(
+        host='redis-19612.c269.eu-west-1-3.ec2.redns.redis-cloud.com',
+        port=19612,
+        password='fYFhIQuN0rrXmEOThVpPxrWRi1Mal2jM',
+        decode_responses=True
+    )
+
+    # Initializing the keyframe queue
+    kf_queue = KeyframeQueue(redis_conn)
+
+    # Example of a keyframe to push to the queue
+    image_path = r'C:\Users\Davide\Documents\GitHub\Soccer_Tactical_Analysis\src\raw_images\img_raw_1.png'
+    video_name = 'example_video.mp4'
+    minute = 5
+    second = 30
+    tracker_data = [
+        ('tracker_id_1', 100, 200),
+        ('tracker_id_2', 300, 400),
+        ('tracker_id_3', 500, 600)
+    ]
+
+    # Opening the PNG image with Pillow
+    try:
+        image = Image.open(image_path)
+    except IOError as e:
+        print(f"Error opening image: {e}")
+        return
+
+    keyframe = Keyframe(image, video_name, minute, second, tracker_data)
+    print(keyframe.video_name)
+    # Adding the keyframe to the queue
+    queue_length = kf_queue.push_keyframe(keyframe)
+    print(f"Queue length after push: {queue_length}")
+
+    # Retrieving and processing a keyframe from the queue
+    keyframe_ref, retrieved_keyframe = kf_queue.pop_keyframe()
+    if retrieved_keyframe:
+        print("Processing keyframe:", retrieved_keyframe)
+        img_frame=retrieved_keyframe.image
+        plt.imshow(img_frame)
+        plt.axis('off')  # Nascondi gli assi
+        plt.show()
+        # After processing, remove the keyframe from the backup queue
+        kf_queue.del_keyframe_from_backup(keyframe_ref)
+
+if __name__ == "__main__":
+    main()

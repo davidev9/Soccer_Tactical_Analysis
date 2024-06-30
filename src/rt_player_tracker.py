@@ -49,6 +49,7 @@ coordinate = {
 def pitch_estimator(field_detections):
     name_array = field_detections.data['class_name']
     id_array = [int(x.strip("'")) for x in name_array]
+    print(id_array)
     num_keypoint=len(id_array)
     points_array = field_detections.get_anchors_coordinates(
                 anchor=sv.Position.BOTTOM_CENTER
@@ -62,8 +63,8 @@ def pitch_estimator(field_detections):
     class_ids = result_array[:4, 0].astype(int)
     source_coordinates = np.array([point for point in first_4_points[:, 1]])
     target_coordinates = np.array([coordinate[class_id] for class_id in class_ids])
-    print(result_array)
-    print(target_coordinates)
+    print("Result array",first_4_points)
+    print("Target array",target_coordinates)
     return np.array(first_4_points),np.array(target_coordinates)
 
 
@@ -124,7 +125,7 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
 
 
     results = player_model(frame, imgsz=1280,conf=0.1)[0]
-    results2=field_model(frame,imgsz=1280,conf=0.009)[0]
+    results2=field_model(frame,imgsz=1280,conf=0.4)[0]
 
     detections = sv.Detections.from_ultralytics(results)
     detections = tracker.update_with_detections(detections).with_nms(threshold=0.1)
@@ -150,7 +151,7 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
         labels=[]
         #Label con le coordinate reali
         for j, detection in enumerate(detections):
-            label=f"{detection[4]} xy:({points[j]})"
+            label=f"{detection[4]} xy:({points[j]} ) {detection[0]}  {detection[1]} "
             labels.append(label)
                  
     else:
@@ -180,7 +181,7 @@ if __name__ == "__main__":
     HOME = os.getcwd()
     print(HOME)
     player_model = YOLO("./yolo_weights/best.pt")
-    field_model = YOLO("./yolo_weights/keypoint_field_v2.pt")
+    field_model = YOLO("./yolo_weights/best_keypoint.pt")
     VIDEO_PATH="./videos/soccernet_1.mp4"
     file_name_with_extension = os.path.basename(VIDEO_PATH)
     videoname = os.path.splitext(file_name_with_extension)[0]
