@@ -10,6 +10,8 @@ from ultralytics import YOLO
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
+from redis import Redis
+from keyframe_queue_interface import *
 
 #Coordinate in metri del Campo 
 coordinate = {
@@ -44,6 +46,10 @@ coordinate = {
     28: (94, 43.16)
 }
 
+def cv2_to_pil(image_cv):
+    image_rgb = cv2.cvtColor(image_cv, cv2.COLOR_BGR2RGB)
+    image_pil = Image.fromarray(image_rgb)
+    return image_pil
 
 #Mapping tra le coordinate dell'immagine e quelle del campo
 def pitch_estimator(field_detections):
@@ -118,7 +124,7 @@ def filter_detections(detections):
 
 
 def process_frame(frame: np.ndarray, _) -> np.ndarray:
-    global source,target
+    global source,target,kf_queue,seconds,minutes,frame_counter,videoname
     ellipse_annotator = sv.EllipseAnnotator(color=sv.Color.YELLOW,thickness=1,start_angle=0,end_angle=200)
     circle_annotator = sv.CircleAnnotator(color=sv.Color.YELLOW,thickness=1)
     label_annotator = sv.LabelAnnotator(color=sv.Color(r=39, g=85, b=156),text_padding=5)
@@ -173,12 +179,49 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
     detections=detections,
     )
 
+
+
+    if frame_counter % 60 == 0 and frame_counter!=0:
+        seconds=seconds+1
+        if seconds % 60 == 0:
+            minutes=minutes+1
+
+
+
+    if frame_counter % 40 == 0 and frame_counter!=0:
+        tracker_data = []
+        for j, detection in enumerate(detections):
+            x, y = points[j][0],points[j][1]
+            print(detection[4])
+            tracker_data.append((int(detection[4]), int(x), int(y)))
+
+        pil_img=cv2_to_pil(annotated_frame)
+        keyframe = Keyframe(pil_img, videoname, minutes, seconds, tracker_data)
+        kf_queue.push_keyframe(keyframe)  
+
+    frame_counter=frame_counter+1
+    print("Frame",frame_counter)
+    print("Minuti",minutes)
+    print("Secondi",seconds)
     return annotated_frame
 
 
 
 if __name__ == "__main__":
     HOME = os.getcwd()
+
+    redis_conn = Redis(
+    host='redis-19612.c269.eu-west-1-3.ec2.redns.redis-cloud.com',
+    port=19612,
+    password='fYFhIQuN0rrXmEOThVpPxrWRi1Mal2jM',
+    decode_responses=True
+    )
+    kf_queue = KeyframeQueue(redis_conn)
+
+    seconds=0
+    minutes=0
+    frame_counter=0
+
     print(HOME)
     player_model = YOLO("./yolo_weights/best.pt")
     field_model = YOLO("./yolo_weights/best_keypoint.pt")

@@ -14,9 +14,6 @@ class Keyframe:
         self.tracker_data = tracker_data
 
     def to_redis_format(self) -> bytes:
-        """
-        Serialize the Keyframe object into a format suitable for Redis storage.
-        """
         image_bytes = self.serialize_image()
         data = {
             'video_name': self.video_name,
@@ -56,11 +53,19 @@ class KeyframeQueue:
             raise ValueError("redis_conn must be a valid Redis connection!")
         self._r = redis_conn
 
+    def list_len(self) -> int:
+        return self._r.llen("keyframes")
+    
+    def BU_list_len(self) -> int:
+        return self._r.llen("keyframes_backup")
+
+
+
     def push_keyframe(self, keyframe: Keyframe) -> int:
         serialized_keyframe = keyframe.to_redis_format()
         return self._r.lpush("keyframes", serialized_keyframe)
 
-    def pop_keyframe(self) -> (bytes | None, Keyframe | None):
+    def pop_keyframe(self):
         serialized_keyframe = self._r.rpoplpush("keyframes", "keyframes_backup")
         if not serialized_keyframe:
             return (None, None)
@@ -68,56 +73,48 @@ class KeyframeQueue:
         keyframe = Keyframe.from_redis_format(serialized_keyframe)
         return serialized_keyframe, keyframe
 
+    def peek_keyframe_backup(self):
+        serialized_keyframe = self._r.lrange("keyframes_backup", -1, -1)
+        if not serialized_keyframe:
+            return (None, None)
+
+
+        keyframe = Keyframe.from_redis_format(serialized_keyframe[0])
+        return serialized_keyframe, keyframe
+
+    def delete_backup(self):
+        self._r.delete("keyframes_backup")
+
+
     def del_keyframe_from_backup(self, keyframe_ref: bytes):
         if keyframe_ref:
             self._r.lrem("keyframes_backup", 1, keyframe_ref)
 
+
 def main():
-    # Connection to Redis with provided credentials
     redis_conn = Redis(
         host='redis-19612.c269.eu-west-1-3.ec2.redns.redis-cloud.com',
         port=19612,
         password='fYFhIQuN0rrXmEOThVpPxrWRi1Mal2jM',
         decode_responses=True
     )
-
+    
     # Initializing the keyframe queue
     kf_queue = KeyframeQueue(redis_conn)
-
-    # Example of a keyframe to push to the queue
-    image_path = r'C:\Users\Davide\Documents\GitHub\Soccer_Tactical_Analysis\src\raw_images\img_raw_1.png'
-    video_name = 'example_video.mp4'
-    minute = 5
-    second = 30
-    tracker_data = [
-        ('tracker_id_1', 100, 200),
-        ('tracker_id_2', 300, 400),
-        ('tracker_id_3', 500, 600)
-    ]
-
-    # Opening the PNG image with Pillow
-    try:
-        image = Image.open(image_path)
-    except IOError as e:
-        print(f"Error opening image: {e}")
-        return
-
-    keyframe = Keyframe(image, video_name, minute, second, tracker_data)
-    print(keyframe.video_name)
-    # Adding the keyframe to the queue
-    queue_length = kf_queue.push_keyframe(keyframe)
-    print(f"Queue length after push: {queue_length}")
-
-    # Retrieving and processing a keyframe from the queue
+    ciao=kf_queue.list_len()
+    print("coda princ",ciao)
     keyframe_ref, retrieved_keyframe = kf_queue.pop_keyframe()
-    if retrieved_keyframe:
-        print("Processing keyframe:", retrieved_keyframe)
-        img_frame=retrieved_keyframe.image
-        plt.imshow(img_frame)
-        plt.axis('off')  # Nascondi gli assi
-        plt.show()
-        # After processing, remove the keyframe from the backup queue
-        kf_queue.del_keyframe_from_backup(keyframe_ref)
+    img_frame=retrieved_keyframe.image
+    plt.imshow(img_frame)
+    plt.axis('off')  # Nascondi gli assi
+    plt.show()
+    ciao=kf_queue.BU_list_len()
+    print("coda back prima",ciao)
+    kf_queue.del_keyframe_from_backup(keyframe_ref)
+    ciao=kf_queue.BU_list_len()
+    print("coda back dopo",ciao)
+
+
 
 if __name__ == "__main__":
     main()
