@@ -4,7 +4,7 @@ import base64
 from io import BytesIO
 import json
 import matplotlib.pyplot as plt
-
+import os
 class Keyframe:
     def __init__(self, image, video_name, minute, second, tracker_data):
         self.image = image
@@ -85,6 +85,9 @@ class KeyframeQueue:
     def delete_backup(self):
         self._r.delete("keyframes_backup")
 
+    def delete_main(self):
+        self._r.delete("keyframes")
+
 
     def del_keyframe_from_backup(self, keyframe_ref: bytes):
         if keyframe_ref:
@@ -93,9 +96,9 @@ class KeyframeQueue:
 
 def main():
     redis_conn = Redis(
-        host='redis-19612.c269.eu-west-1-3.ec2.redns.redis-cloud.com',
-        port=19612,
-        password='fYFhIQuN0rrXmEOThVpPxrWRi1Mal2jM',
+        host=os.getenv("REDIS_HOST"),
+        port=os.getenv("REDIS_PORT"),
+        password=os.getenv("REDIS_PASSWORD"),
         decode_responses=True
     )
     

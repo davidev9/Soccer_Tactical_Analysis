@@ -58,8 +58,10 @@ def pitch_estimator(field_detections):
     print(id_array)
     num_keypoint=len(id_array)
     points_array = field_detections.get_anchors_coordinates(
-                anchor=sv.Position.BOTTOM_CENTER
+                anchor=sv.Position.CENTER
             )
+    print("points array:",points_array)
+    print("classi",id_array)
     if num_keypoint<4:
         return [],[]
     first_4_ids = id_array[:4]
@@ -157,7 +159,8 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
         labels=[]
         #Label con le coordinate reali
         for j, detection in enumerate(detections):
-            label=f"{detection[4]} xy:({points[j]} ) {detection[0]}  {detection[1]} "
+            #label=f"{detection[4]} xy:({points[j]} ) {detection[0]}  {detection[1]} "
+            label=f"{detection[4]}"
             labels.append(label)
                  
     else:
@@ -192,12 +195,11 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
         tracker_data = []
         for j, detection in enumerate(detections):
             x, y = points[j][0],points[j][1]
-            print(detection[4])
-            tracker_data.append((int(detection[4]), int(x), int(y)))
+            tracker_data.append((int(detection[4]), int(x), int(y),detection[0]))
 
         pil_img=cv2_to_pil(annotated_frame)
         keyframe = Keyframe(pil_img, videoname, minutes, seconds, tracker_data)
-        kf_queue.push_keyframe(keyframe)  
+        #kf_queue.push_keyframe(keyframe)  
 
     frame_counter=frame_counter+1
     print("Frame",frame_counter)
@@ -211,10 +213,10 @@ if __name__ == "__main__":
     HOME = os.getcwd()
 
     redis_conn = Redis(
-    host='redis-19612.c269.eu-west-1-3.ec2.redns.redis-cloud.com',
-    port=19612,
-    password='fYFhIQuN0rrXmEOThVpPxrWRi1Mal2jM',
-    decode_responses=True
+        host=os.getenv("REDIS_HOST"),
+        port=os.getenv("REDIS_PORT"),
+        password=os.getenv("REDIS_PASSWORD"),
+        decode_responses=True
     )
     kf_queue = KeyframeQueue(redis_conn)
 
