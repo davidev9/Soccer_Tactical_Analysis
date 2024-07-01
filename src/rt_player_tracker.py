@@ -172,15 +172,6 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
     annotated_frame = label_annotator.annotate(
     scene=annotated_frame, detections=detections, labels=labels) 
     #Annotazione delle istanze dei keypoint e dei players
-    annotated_frame = circle_annotator.annotate(
-    scene=annotated_frame,
-    detections=detections2,
-    )
-
-    annotated_frame = ellipse_annotator.annotate(
-    scene=annotated_frame,
-    detections=detections,
-    )
 
 
 
@@ -195,16 +186,30 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
         tracker_data = []
         for j, detection in enumerate(detections):
             x, y = points[j][0],points[j][1]
-            tracker_data.append((int(detection[4]), int(x), int(y),detection[0]))
+            x1,y1=detection[0][0],detection[0][1]
+            x2,y2=detection[0][2],detection[0][3]
+            tracker_data.append((int(detection[4]), int(x), int(y),int(x1),int(y1),int(x2),int(y2)))
 
         pil_img=cv2_to_pil(annotated_frame)
         keyframe = Keyframe(pil_img, videoname, minutes, seconds, tracker_data)
-        #kf_queue.push_keyframe(keyframe)  
+        code_len=kf_queue.push_keyframe(keyframe)  
+        print("Lunghezza coda:",code_len)
 
     frame_counter=frame_counter+1
     print("Frame",frame_counter)
     print("Minuti",minutes)
     print("Secondi",seconds)
+
+
+    annotated_frame = circle_annotator.annotate(
+    scene=annotated_frame,
+    detections=detections2,
+    )
+
+    annotated_frame = ellipse_annotator.annotate(
+    scene=annotated_frame,
+    detections=detections,
+    )
     return annotated_frame
 
 
