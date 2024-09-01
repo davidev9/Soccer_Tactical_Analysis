@@ -182,12 +182,13 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
 
 
 
-    if frame_counter % 40 == 0 and frame_counter!=0:
+    if frame_counter % 60 == 0 and frame_counter!=0:
         tracker_data = []
         for j, detection in enumerate(detections):
             x, y = points[j][0],points[j][1]
             x1,y1=detection[0][0],detection[0][1]
             x2,y2=detection[0][2],detection[0][3]
+            #numero tracker, coordinata x reale, coordinata y reale, coordinate nel frame
             tracker_data.append((int(detection[4]), int(x), int(y),int(x1),int(y1),int(x2),int(y2)))
 
         pil_img=cv2_to_pil(annotated_frame)
@@ -216,7 +217,6 @@ def process_frame(frame: np.ndarray, _) -> np.ndarray:
 
 if __name__ == "__main__":
     HOME = os.getcwd()
-
     redis_conn = Redis(
         host=os.getenv("REDIS_HOST"),
         port=os.getenv("REDIS_PORT"),
@@ -232,7 +232,7 @@ if __name__ == "__main__":
     print(HOME)
     player_model = YOLO("./yolo_weights/best.pt")
     field_model = YOLO("./yolo_weights/best_keypoint.pt")
-    VIDEO_PATH="./videos/soccernet_1.mp4"
+    VIDEO_PATH="./videos/s_1.mp4"
     file_name_with_extension = os.path.basename(VIDEO_PATH)
     videoname = os.path.splitext(file_name_with_extension)[0]
     tracker = sv.ByteTrack()

@@ -1,0 +1,51 @@
+from redis import Redis
+from PIL import Image
+import base64
+from io import BytesIO
+import json
+import matplotlib.pyplot as plt
+from  keyframe_queue_interface import *
+
+def main():
+    redis_conn = Redis(
+        host=os.getenv("REDIS_HOST"),
+        port=os.getenv("REDIS_PORT"),
+        password=os.getenv("REDIS_PASSWORD"),
+        decode_responses=True
+    )
+    
+    # Initializing the keyframe queue
+    kf_queue = KeyframeQueue(redis_conn)
+    
+    # Continuously pop from main queue and delete from backup queue until main queue is empty
+    while kf_queue.list_len() > 0:
+        keyframe_ref, retrieved_keyframe = kf_queue.pop_keyframe()
+        
+        if retrieved_keyframe:
+            print(f"Popped keyframe from main queue: {retrieved_keyframe.video_name} at {retrieved_keyframe.minute}:{retrieved_keyframe.second}")
+            
+            # Optionally display the image
+            img_frame = retrieved_keyframe.image
+            plt.imshow(img_frame)
+            plt.axis('off')  # Hide axes
+            plt.show()
+            
+            # Peek the last item from backup queue
+            backup_ref, backup_keyframe = kf_queue.peek_keyframe_backup()
+            if backup_keyframe:
+                print(f"Peeked keyframe in backup queue: {backup_keyframe.video_name} at {backup_keyframe.minute}:{backup_keyframe.second}")
+                
+                # Delete the item from backup queue
+                kf_queue.del_keyframe_from_backup(backup_ref)
+                print("Deleted keyframe from backup queue")
+        
+        print("Remaining items in main queue:", kf_queue.list_len())
+        print("Remaining items in backup queue:", kf_queue.BU_list_len())
+    
+    # After processing all keyframes, delete both queues
+    kf_queue.delete_main()
+    kf_queue.delete_backup()
+    print("Both main and backup queues have been deleted")
+
+if __name__ == "__main__":
+    main()
