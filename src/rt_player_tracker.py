@@ -126,93 +126,85 @@ def filter_detections(detections):
 
 
 def process_frame(frame: np.ndarray, _) -> np.ndarray:
-    global source,target,kf_queue,seconds,minutes,frame_counter,videoname
-    ellipse_annotator = sv.EllipseAnnotator(color=sv.Color.YELLOW,thickness=1,start_angle=0,end_angle=200)
-    circle_annotator = sv.CircleAnnotator(color=sv.Color.YELLOW,thickness=1)
-    label_annotator = sv.LabelAnnotator(color=sv.Color(r=39, g=85, b=156),text_padding=5)
-
-
-    results = player_model(frame, imgsz=1280,conf=0.1)[0]
-    results2=field_model(frame,imgsz=1280,conf=0.4)[0]
-
-    detections = sv.Detections.from_ultralytics(results)
-    detections = tracker.update_with_detections(detections).with_nms(threshold=0.1)
-
-
-    detections2= sv.Detections.from_ultralytics(results2)
-    detections2=filter_detections(detections2)
+    global source, target, kf_queue, seconds, minutes, frame_counter, videoname
+    annotated_frame = frame.copy()
+    frame_counter = frame_counter + 1
     
-    new_source,new_target=pitch_estimator(detections2)
-    if len(new_source) > 0:
-        source=new_source
-        target=new_target
+    try:
+        if frame_counter % 60 == 0 and frame_counter != 0:
+            seconds = seconds + 1
+            if seconds % 60 == 0:
+                minutes = minutes + 1
+                seconds = 0
 
-    annotated_frame=frame.copy()
+        if frame_counter % 6 == 0 and frame_counter != 0:
+            ellipse_annotator = sv.EllipseAnnotator(color=sv.Color.YELLOW, thickness=1, start_angle=0, end_angle=200)
+            circle_annotator = sv.CircleAnnotator(color=sv.Color.YELLOW, thickness=1)
+            label_annotator = sv.LabelAnnotator(color=sv.Color(r=39, g=85, b=156), text_padding=5)
 
-    #Se sono stati calcolati source e target vengono convertite le coordinate e inserite nelle label
-    if len(source) > 0:
-        view_transformer = ViewTransformer(source=source, target=target)
-        points = detections.get_anchors_coordinates(
-                    anchor=sv.Position.BOTTOM_CENTER
+            # Modelli di rilevamento
+            results = player_model(frame, imgsz=1280, conf=0.1)[0]
+            results2 = field_model(frame, imgsz=1280, conf=0.4)[0]
+
+            # Detections
+            detections = sv.Detections.from_ultralytics(results)
+            detections = tracker.update_with_detections(detections).with_nms(threshold=0.1)
+
+            detections2 = sv.Detections.from_ultralytics(results2)
+            detections2 = filter_detections(detections2)
+
+            new_source, new_target = pitch_estimator(detections2)
+            if len(new_source) > 0:
+                source = new_source
+                target = new_target
+
+            annotated_frame = frame.copy()
+
+            # Trasformazione delle coordinate
+            if len(source) > 0:
+                view_transformer = ViewTransformer(source=source, target=target)
+                points = detections.get_anchors_coordinates(anchor=sv.Position.BOTTOM_CENTER)
+                points = view_transformer.transform_points(points=points).astype(int)
+                labels = []
+                
+                for j, detection in enumerate(detections):
+                    label = f"{detection[4]}"
+                    labels.append(label)
+            else:
+                labels = []
+                for j, detection in enumerate(detections):
+                    label = f"{detection[4]}"
+                    labels.append(label)
+
+            annotated_frame = label_annotator.annotate(
+                scene=annotated_frame, detections=detections, labels=labels
             )
-        points = view_transformer.transform_points(points=points).astype(int)
-        labels=[]
-        #Label con le coordinate reali
-        for j, detection in enumerate(detections):
-            #label=f"{detection[4]} xy:({points[j]} ) {detection[0]}  {detection[1]} "
-            label=f"{detection[4]}"
-            labels.append(label)
-                 
-    else:
-        labels=[]
-        for j, detection in enumerate(detections):
-                label=f"{detection[4]}"
-                labels.append(label)      
 
-    annotated_frame = label_annotator.annotate(
-    scene=annotated_frame, detections=detections, labels=labels) 
-    #Annotazione delle istanze dei keypoint e dei players
+            if frame_counter % 60 == 0 and frame_counter != 0:
+                tracker_data = []
+                for j, detection in enumerate(detections):
+                    x, y = points[j][0], points[j][1]
+                    x1, y1 = detection[0][0], detection[0][1]
+                    x2, y2 = detection[0][2], detection[0][3]
+                    tracker_data.append((int(detection[4]), int(x), int(y), int(x1), int(y1), int(x2), int(y2)))
 
+                pil_img = cv2_to_pil(annotated_frame)
+                keyframe = Keyframe(pil_img, videoname, minutes, seconds, tracker_data)
+                code_len = kf_queue.push_keyframe(keyframe)
+                print("Lunghezza coda:", code_len)
 
+            print("Frame", frame_counter)
+            print("Minuti", minutes)
+            print("Secondi", seconds)
 
-    if frame_counter % 60 == 0 and frame_counter!=0:
-        seconds=seconds+1
-        if seconds % 60 == 0:
-            minutes=minutes+1
+            # Annotazione dei keypoint e delle ellissi
+            annotated_frame = circle_annotator.annotate(scene=annotated_frame, detections=detections2)
+            annotated_frame = ellipse_annotator.annotate(scene=annotated_frame, detections=detections)
 
+    except Exception as e:
+        print(f"Errore durante l'elaborazione del frame: {e}")
 
-
-    if frame_counter % 60 == 0 and frame_counter!=0:
-        tracker_data = []
-        for j, detection in enumerate(detections):
-            x, y = points[j][0],points[j][1]
-            x1,y1=detection[0][0],detection[0][1]
-            x2,y2=detection[0][2],detection[0][3]
-            #numero tracker, coordinata x reale, coordinata y reale, coordinate nel frame
-            tracker_data.append((int(detection[4]), int(x), int(y),int(x1),int(y1),int(x2),int(y2)))
-
-        pil_img=cv2_to_pil(annotated_frame)
-        keyframe = Keyframe(pil_img, videoname, minutes, seconds, tracker_data)
-        code_len=kf_queue.push_keyframe(keyframe)  
-        print("Lunghezza coda:",code_len)
-
-    frame_counter=frame_counter+1
-    print("Frame",frame_counter)
-    print("Minuti",minutes)
-    print("Secondi",seconds)
-
-
-    annotated_frame = circle_annotator.annotate(
-    scene=annotated_frame,
-    detections=detections2,
-    )
-
-    annotated_frame = ellipse_annotator.annotate(
-    scene=annotated_frame,
-    detections=detections,
-    )
     return annotated_frame
-
 
 
 if __name__ == "__main__":
@@ -223,6 +215,7 @@ if __name__ == "__main__":
         password=os.getenv("REDIS_PASSWORD"),
         decode_responses=True
     )
+
     kf_queue = KeyframeQueue(redis_conn)
 
     seconds=0
@@ -232,7 +225,7 @@ if __name__ == "__main__":
     print(HOME)
     player_model = YOLO("./yolo_weights/best.pt")
     field_model = YOLO("./yolo_weights/best_keypoint.pt")
-    VIDEO_PATH="./videos/s_1.mp4"
+    VIDEO_PATH="./videos/soccernet_2.mp4"
     file_name_with_extension = os.path.basename(VIDEO_PATH)
     videoname = os.path.splitext(file_name_with_extension)[0]
     tracker = sv.ByteTrack()
