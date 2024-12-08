@@ -1,4 +1,4 @@
-#Temporal Knowledge Graph Construction from Football Match Videos
+# Temporal Knowledge Graph Construction from Football Match Videos
 
 ## Folder Structure
 - `src`: contains the source code for the entire project.
@@ -20,8 +20,6 @@ Before starting the system components, the following environment variables must 
 - `ARANGO_PASSWORD`: The password for ArangoDB.
 
 
-markdown
-Copia codice
 ### Run the RT processor
 
 ```bash
