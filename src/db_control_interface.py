@@ -15,22 +15,18 @@ class Triplet:
 
 def connect_to_arangodb(encodedCA, db_host, db_username, db_password):
     try:
-        # Decode the certificate
         file_content = base64.b64decode(encodedCA)
         
-        # Write the certificate to a file
         with open("cert_file.crt", "w+") as f:
             f.write(file_content.decode("utf-8"))
     except Exception as e:
         print(f"Error decoding and writing certificate: {str(e)}")
         sys.exit(1)
 
-    # Initialize the ArangoDB client
     client = ArangoClient(
         hosts=db_host, verify_override="cert_file.crt"
     )
 
-    # Connect to the '_system' database as the specified user
     try:
         sys_db = client.db("_system", username=db_username, password=db_password)
         print("ArangoDB version:", sys_db.version())
@@ -42,7 +38,6 @@ def connect_to_arangodb(encodedCA, db_host, db_username, db_password):
 def initialize_database(connector, db_name, username, password, user=None):
     sys_db = connector.db('_system', username=username, password=password)
     
-    # Check esistenza del db
     if not sys_db.has_database(db_name):
         # Create the database with the specified user if it does not exist
         if user:
