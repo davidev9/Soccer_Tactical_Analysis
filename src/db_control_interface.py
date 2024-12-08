@@ -91,35 +91,3 @@ def push_triplet(db, graph_name, triplet):
         'seconds': triplet.seconds
     })
 
-def main():
-    encodedCA = "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCk1JSURHVENDQWdHZ0F3SUJBZ0lSQU5pWS81VmlPMk82bXFpVG1HUDZ2RFF3RFFZSktvWklodmNOQVFFTEJRQXcKSmpFUk1BOEdBMVVFQ2hNSVFYSmhibWR2UkVJeEVUQVBCZ05WQkFNVENFRnlZVzVuYjBSQ01CNFhEVEkwTURZeQpOekV4TkRneU5sb1hEVEk1TURZeU5qRXhORGd5Tmxvd0pqRVJNQThHQTFVRUNoTUlRWEpoYm1kdlJFSXhFVEFQCkJnTlZCQU1UQ0VGeVlXNW5iMFJDTUlJQklqQU5CZ2txaGtpRzl3MEJBUUVGQUFPQ0FROEFNSUlCQ2dLQ0FRRUEKdHV1bEJWUmNMSDMrNndDVnYxejE1Ymh4c2Ixdko2NTM2cnlEb2g0Q0s3cmlZRmM0Y1JuVlNhN3NZaUhzMmEyagpaR2RPb2NiZWwzTExiNTlFR1hIWGhoSSs5U0RZUlFUdTRVckZwUjZaTk51S2VYOUp3d3NMWGZpSVdSM29JSjFrCk8vM2xVSzJUdFQ5azZOWGNCZUdnY2o0SEJLb0JtNVRrSnVUdDU5WHVWU1NHQzVqa05pNWZRaTJqaDBlMG5WcUQKSnFhU1VkVkdxUjZJaXdTL3pGQmlQZSsvOEFEYmxSeTljQUR4aDNFUmVSaGhJOVUrS2NBZm1CcFI1OGpyeU9PYQpNNUlyZlBhckxmYVhIbWJqQ1krZG1WVThPNTNkL1RRVi9obW15OGJINXVZTkJwamlTL2dBaVNwM3FDN1pOUm1TClRRUVh3cVduMXRYRFp5YTBKZWcwK1FJREFRQUJvMEl3UURBT0JnTlZIUThCQWY4RUJBTUNBcVF3RHdZRFZSMFQKQVFIL0JBVXdBd0VCL3pBZEJnTlZIUTRFRmdRVWx2RUdUK2FaUTV1SVhlTnZvd282VGtvODZzVXdEUVlKS29aSQpodmNOQVFFTEJRQURnZ0VCQUNJS21kR1lqbWhKdDBqZzhJY1lDUGZwL2I2Ny9scmlkKzVub3dZVXRPZWQycXRNCnpoM2pOd3JpNjIzaVFZOFd1anc4SmJpdWgvdTVlbWdCQUJZRGN3cFRDZFdzUUVsemxtdVFuNGV2bHVVVkxZSlUKMVVFTGVpclRxb2g3YjlYdXFUbnBuaG9tdFdLdW9NZm9sOEVJZ2FOTTVZR3Q4UkhUQW9hRVdyWDNyR0phMmJoKwpOQUJkQzJmWUp0MWFsaFc5U3JaT1N6dis0UWN2WTBqa0hpaXpibDFEZ3RGYjcxaEdSeS96UnhORkNrZWp0V2ZQCkR2UFR4OEppNzlNZjNXMnRxcE05UlVQS2pkOUJrTUxvTFZkbTJsM0VENm5kWjhvZkgyNjVCQ2ZRWnpOQ0JsNlMKN2xES2FpdTVtejFLaTVFaGlYSUlLS1Uzc1NDOHFoYWlVSmt1MWhVPQotLS0tLUVORCBDRVJUSUZJQ0FURS0tLS0tCg=="
-    db_host = "https://1be362bd9a71.arangodb.cloud:18529"
-    db_username = "root"
-    db_password = "VEzSjRTobBNejFOvRbQg"
-
-    # Connect to ArangoDB
-    sys_db,client = connect_to_arangodb(encodedCA, db_host, db_username, db_password)
-
-    # Initialize the "test" database
-    db = initialize_database(client, "test", db_username, db_password)
-
-    # Parameters for the triplet
-    entity1_name = "Alice"
-    category1 = "students"
-    entity2_name = "Math101"
-    category2 = "lectures"
-    relation_name = "enrolled_in"
-    minutes = 90
-    seconds = 0
-
-    # Push the triplet into the graph
-    push_triplet(db, "school", entity1_name, category1, entity2_name, category2, relation_name, minutes, seconds)
-
-    # Verify the inserted data
-    school_graph = db.graph("school")
-    print(school_graph.vertex_collection("students").all())
-    print(school_graph.vertex_collection("lectures").all())
-    print(school_graph.edge_collection("enrolled_in").all())
-
-if __name__ == "__main__":
-    main()
